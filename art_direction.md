@@ -1,0 +1,5 @@
+- Colorful stylized low-poly, sunny Istanbul afternoon
+- Palette: terracotta, turquoise, cream, saffron, Bosphorus blue
+- Warm directional light, light fog
+- Key model: red delivery scooter with food box
+- City built from primitives: colorful houses, domes, minarets, restaurants with awnings, round trees
