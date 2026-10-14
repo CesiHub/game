@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MotoKurye: İstanbul</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <!--
+      Rosebud defaults disable accidental selection, context menus, tap highlights,
+      and native dragging during gameplay while preserving text editing. Most games
+      need no customization.
+    -->
+    <link rel="stylesheet" href="./rosebud-game-defaults.css" />
+    <script src="./rosebud-game-defaults.js" defer></script>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://esm.sh/three@0.184.0",
+          "three/": "https://esm.sh/three@0.184.0/"
+        }
+      }
+    </script>
+    <style>
+      html, body { width: 100%; height: 100%; margin: 0; padding: 0; background: #b8ccd1; overflow: hidden; }
+      body { touch-action: none; font-family: Inter, system-ui, sans-serif; }
+      canvas { display: block; }
+      #game-container { position: fixed; inset: 0; z-index: 0; overflow: hidden; background: #b8ccd1; }
+      #game-container > canvas { width: 100%; height: 100%; }
+      :root { --minimap-size: clamp(162px, 21vw, 188px); }
+      #hud { position: fixed; top: calc(max(12px, 5vh, env(safe-area-inset-top)) + 50px); left: auto; right: max(12px, 3vw, env(safe-area-inset-right)); display: flex; flex-direction: column; align-items: flex-end; gap: 6px; max-width: calc(100vw - var(--minimap-size) - max(48px, 8vw, calc(env(safe-area-inset-left) + env(safe-area-inset-right) + 12px))); pointer-events: none; z-index: 7; }
+      .pill { box-sizing: border-box; background: rgba(20,30,50,.86); color: #fff; padding: 8px 12px; border-radius: 20px; font-weight: 800; font-size: 13px; }
+      #hud .pill { max-width: 100%; white-space: normal; }
+      #minimap-panel { position: fixed; top: calc(max(12px, 5vh, env(safe-area-inset-top)) + 50px); left: max(12px, 3vw, env(safe-area-inset-left)); right: auto; width: var(--minimap-size); box-sizing: border-box; padding: 6px; border: 1px solid rgba(190,220,240,.55); border-radius: 14px; background: rgba(7,17,27,.94); box-shadow: 0 5px 20px rgba(0,0,0,.48); color: #fff; pointer-events: none; z-index: 8; }
+      .minimap-head { display: flex; justify-content: space-between; align-items: center; min-height: 13px; margin: 0 2px 4px; font: 800 9px/1 Inter, sans-serif; letter-spacing: .06em; color: #dce8f2; }
+      #minimap-phase { color: #f6d56a; font-size: 8px; }
+      #minimap-canvas { display: block; width: 100%; aspect-ratio: 1; border-radius: 9px; background: #334650; }
+      .minimap-legend { display: flex; justify-content: space-between; gap: 3px; margin: 5px 1px 0; color: #e6edf4; font: 700 8px/1.2 Inter, sans-serif; white-space: nowrap; }
+      .minimap-legend span { display: inline-flex; align-items: center; gap: 3px; }
+      .minimap-dot { width: 6px; height: 6px; flex: 0 0 6px; border-radius: 50%; box-shadow: 0 0 0 1px rgba(255,255,255,.72); }
+      .minimap-dot.player { background: #36a8ff; }
+      .minimap-dot.restaurant { background: #20df78; }
+      .minimap-dot.customer { background: #ffd33d; }
+      .minimap-dot.fuel { background: #18c8e8; }
+      #msg { position: fixed; top: calc(max(12px, 5vh, env(safe-area-inset-top)) + var(--minimap-size) + 88px); width: 100%; text-align: center; color: #fff; font-weight: 800; font-size: 18px; text-shadow: 0 2px 6px #000; pointer-events: none; z-index: 6; }
+      #top-actions { position:fixed; top:max(12px,5vh,env(safe-area-inset-top)); right:max(12px,3vw,env(safe-area-inset-right)); display:flex; align-items:center; justify-content:flex-end; gap:10px; z-index:11; pointer-events:auto; }
+      #top-actions .pill { position:static; flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; height:40px; padding:0 11px; border:1px solid rgba(255,255,255,.45); cursor:pointer; line-height:1; white-space:nowrap; }
+      #top-actions #settings-open, #top-actions #mute { width:42px; padding:0; font-size:20px; }
+      @media (min-width: 700px) { #hud { top: max(12px, 5vh, env(safe-area-inset-top)); left: calc(max(12px, 3vw, env(safe-area-inset-left)) + var(--minimap-size) + max(18px, 3vw)); right: calc(max(12px, 3vw, env(safe-area-inset-right)) + 190px); max-width: none; flex-direction: row; flex-wrap: wrap; align-items: flex-start; } }
+      @media (max-height: 620px) { #msg { top: calc(max(12px, 5vh, env(safe-area-inset-top)) + var(--minimap-size) + 88px); } }
+      #start { position: fixed; inset: 0; background: rgba(10,30,60,.85); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; z-index: 10; }
+      #start h1 { font-family: Orbitron; color: #ffcf3f; margin: 0 0 10px; }
+      #start button { font-size: 22px; padding: 14px 40px; border: 0; border-radius: 30px; background: #e63b2e; color: #fff; font-weight: 800; margin-top: 16px; }
+      .tb { position: fixed; bottom: 5%; width: 76px; height: 76px; border-radius: 50%; background: rgba(255,255,255,.25); border: 3px solid rgba(255,255,255,.6); color: #fff; font-size: 26px; font-weight: 800; display: flex; align-items: center; justify-content: center; z-index: 5; }
+      .tb.on { background: rgba(255,207,63,.7); }
+      #steering-area { position:fixed; left:max(12px,3vw,env(safe-area-inset-left)); bottom:calc(5% + 82px + env(safe-area-inset-bottom)); width:min(44vw,250px); height:min(30vh,170px); z-index:4; display:none; align-items:center; justify-content:center; box-sizing:border-box; padding:10px; border:1px solid rgba(190,220,240,.32); border-radius:22px; color:rgba(255,255,255,.78); background:radial-gradient(ellipse,rgba(50,105,145,.18),rgba(7,17,27,.08)); text-align:center; font:700 11px/1.35 Inter,sans-serif; touch-action:none; -webkit-user-select:none; user-select:none; }
+      #steering-area.active { display:flex; pointer-events:auto; }
+      #steering-area span { pointer-events:none; }
+      #garage-overlay { position: fixed; inset: 0; z-index: 30; display: none; align-items: center; justify-content: center; padding: 12px; box-sizing: border-box; background: rgba(4,10,20,.86); color: #f6f7fb; }
+      #garage-overlay.open { display: flex; }
+      .garage-panel { width: min(960px, 100%); max-height: min(92vh, 900px); display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(255,207,63,.45); border-radius: 18px; background: linear-gradient(145deg, #18263a, #0b1320); box-shadow: 0 18px 60px rgba(0,0,0,.6); }
+      .garage-head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:14px 16px 10px; }
+      .garage-head h2 { margin:0; color:#ffcf3f; font:700 20px Orbitron, sans-serif; }
+      .garage-head p { margin:5px 0 0; color:#bdc8d8; font-size:12px; }
+      .garage-close, .garage-action, .garage-tab { border:0; border-radius:10px; padding:10px 12px; font:700 13px Inter, sans-serif; color:#fff; background:#30445e; cursor:pointer; }
+      .garage-close { background:#a63832; font-size:18px; min-width:42px; }
+      .garage-tabs { display:flex; gap:7px; padding:0 12px 10px; overflow-x:auto; scrollbar-width:thin; }
+      .garage-tab { flex:0 0 auto; background:#26374d; }
+      .garage-tab.active { background:#d79c1d; color:#151a22; }
+      #garage-content { overflow-y:auto; padding:0 14px 14px; -webkit-overflow-scrolling:touch; }
+      .dealer-preview-card { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(190px,.85fr); gap:14px; align-items:stretch; margin-bottom:12px; padding:12px; border:1px solid rgba(255,207,63,.26); border-radius:14px; background:rgba(255,255,255,.055); }
+      .dealer-preview-stage { position:relative; min-height:230px; overflow:hidden; border:1px solid rgba(255,207,63,.28); border-radius:12px; background:radial-gradient(ellipse at 50% 75%,#35455a,#101927 68%); }
+      .dealer-preview-stage canvas { display:block; width:100%; height:100%; min-height:230px; }
+      .dealer-preview-copy { align-self:center; }
+      .dealer-model-card { position:relative; }
+      .dealer-model-card.selected { border-color:#ffcf3f; box-shadow:inset 0 0 0 1px #ffcf3f55; }
+      .dealer-model-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+      .dealer-model-actions .garage-action { flex:1 1 auto; margin:0; padding:9px 10px; font-size:12px; }
+      .dealer-preview-copy { min-width:0; }
+      .dealer-preview-copy h3 { margin:8px 0; color:#fff1c2; font-size:20px; }
+      .dealer-preview-copy p { color:#ccd7e3; font-size:13px; line-height:1.45; }
+      .dealer-eyebrow { color:#ffcf3f; font-size:10px; font-weight:800; letter-spacing:.12em; }
+      .dealer-purchase-note { min-height:34px; }
+      .dealer-preview-buy { width:100%; margin:4px 0 0; padding:12px; font-size:14px; }
+      .dealer-drag-hint { color:#9fb2c8 !important; font-size:11px !important; }
+      .dealer-preview-stage canvas { touch-action:none; cursor:grab; }
+      .dealer-preview-stage canvas:active { cursor:grabbing; }
+      .dealer-catalog-heading { display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin:14px 2px 8px; }
+      .dealer-catalog-heading h3 { margin:0; color:#ffdf80; font-size:16px; }
+      .dealer-catalog-heading span { color:#aabbd0; font-size:11px; text-align:right; }
+      .dealer-catalog-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); gap:10px; padding-bottom:4px; }
+      .dealer-model-card { min-width:0; border-color:rgba(255,255,255,.14); transition:border-color .18s ease,box-shadow .18s ease,transform .18s ease; }
+      .dealer-model-card.selected { border-color:#ffcf3f; box-shadow:inset 0 0 0 1px #ffcf3f55,0 7px 22px #0003; transform:translateY(-1px); }
+      .dealer-model-card h3 { margin-top:9px; }
+      .dealer-card-top { display:flex; align-items:center; justify-content:space-between; gap:8px; color:#fff; font-size:13px; }
+      .dealer-class-chip { display:inline-block; padding:4px 7px; border-radius:999px; color:#182332; background:#ffcf3f; font-size:10px; font-weight:800; }
+      .dealer-model-specs { color:#aabbd0 !important; font-size:11px !important; }
+      .dealer-model-specs span { color:#ffcf3f; }
+      #bL,#bR,#bB,#bG { box-sizing:border-box; touch-action:none; -webkit-user-select:none; user-select:none; }
+      #bL,#bR { width:76px; height:76px; border-radius:50%; background:rgba(35,116,190,.42); border-color:rgba(177,224,255,.85); box-shadow:0 4px 15px rgba(0,0,0,.28); }
+      .garage-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr)); gap:10px; }
+      .garage-card { border:1px solid rgba(255,255,255,.12); border-radius:13px; padding:13px; background:rgba(255,255,255,.055); }
+      .garage-card h3 { margin:0 0 7px; font-size:16px; color:#ffe08a; }
+      .garage-card p { margin:5px 0; color:#d4dce7; font-size:13px; line-height:1.4; }
+      .garage-card strong { color:#fff; }
+      .garage-action { margin:8px 5px 0 0; background:#177b5a; }
+      .garage-action.secondary { background:#455b77; }
+      .garage-action:disabled { opacity:.45; cursor:not-allowed; }
+      #garage-content .garage-action { max-width:100%; white-space:normal; }
+      .listing-price-input { box-sizing:border-box; width:min(180px, 55vw); margin:5px 0; padding:8px; border:1px solid rgba(255,255,255,.25); border-radius:8px; background:#101b2a; color:#fff; font:600 14px Inter,sans-serif; }
+      .garage-notice { min-height:20px; margin:0 14px 8px; color:#ffd56a; font-size:13px; }
+      .garage-confirm { position:fixed; inset:0; z-index:35; display:none; align-items:center; justify-content:center; padding:18px; background:rgba(0,0,0,.72); }
+      .garage-confirm.open { display:flex; }
+      .garage-confirm-card { width:min(420px,100%); padding:18px; border-radius:16px; border:1px solid #ffcf3f; background:#172437; box-shadow:0 15px 50px #0009; }
+      .garage-confirm-card h3 { margin:0 0 10px; color:#ffcf3f; }
+      .garage-confirm-card p { white-space:pre-line; color:#e4e9f0; line-height:1.5; }
+      .garage-bottom { display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; }
+      #bike-dashboard { position:fixed; right:max(4%, env(safe-area-inset-right)); bottom:calc(5% + 96px + env(safe-area-inset-bottom)); z-index:6; width:min(184px, 42vw); box-sizing:border-box; padding:8px 10px; border:1px solid rgba(205,225,240,.5); border-radius:12px; background:rgba(7,17,27,.88); color:#fff; font:700 11px/1.3 Inter,sans-serif; text-shadow:0 1px 3px #000; pointer-events:none; }
+      #bike-dashboard .dashboard-speed { display:flex; align-items:baseline; justify-content:space-between; margin-bottom:5px; font-size:13px; }
+      #bike-dashboard .dashboard-speed strong { color:#fff; font:800 20px/1 Orbitron,Inter,sans-serif; }
+      .dashboard-meter { display:grid; grid-template-columns:38px 1fr 30px; gap:5px; align-items:center; margin-top:4px; }
+      .dashboard-meter-track { height:6px; overflow:hidden; border-radius:6px; background:rgba(255,255,255,.2); }
+      .dashboard-meter-fill { display:block; height:100%; width:0; border-radius:inherit; background:#35a7ff; transition:width .15s linear, background-color .15s linear; }
+      .dashboard-meter.condition .dashboard-meter-fill { background:#39df9a; }
+      .dashboard-meter-fill.warning { background:#ffd34d !important; }
+      .dashboard-meter-fill.critical { background:#ff4e4e !important; }
+      #bB { font-size:12px; line-height:1.05; text-align:center; }
+      #day-summary { position:fixed; inset:0; z-index:40; display:none; align-items:center; justify-content:center; padding:14px; box-sizing:border-box; background:rgba(2,8,16,.82); color:#f5f7fb; }
+      #day-summary.open { display:flex; }
+      .day-summary-card { width:min(620px,100%); max-height:min(90vh,700px); overflow:auto; padding:18px; box-sizing:border-box; border:1px solid rgba(255,207,63,.65); border-radius:16px; background:linear-gradient(145deg,#18263a,#0b1320); box-shadow:0 18px 60px #000a; }
+      .day-summary-card h2 { margin:0 0 12px; color:#ffcf3f; font:700 20px Orbitron,Inter,sans-serif; }
+      #day-summary-content { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:7px; }
+      #day-summary-content p { margin:0; padding:8px 10px; border-radius:8px; background:rgba(255,255,255,.06); font-size:13px; }
+      .career-progress { height:9px; margin:8px 0; overflow:hidden; border-radius:8px; background:rgba(255,255,255,.16); }
+      .career-progress i { display:block; height:100%; background:linear-gradient(90deg,#36a8ff,#39df9a); }
+      .career-company { border-left:3px solid #ffcf3f; }
+      @media (max-width:560px) { #bike-dashboard { width:min(166px, 43vw); padding:7px 8px; bottom:calc(5% + 94px + env(safe-area-inset-bottom)); } #bike-dashboard .dashboard-meter { grid-template-columns:34px 1fr 28px; } #bike-dashboard .dashboard-speed strong { font-size:18px; } }
+      .performance-bike-selector { display:flex; flex-wrap:wrap; gap:6px; }
+      .performance-card { min-width:0; }
+      .performance-card .garage-action { font-size:12px; padding:8px 9px; }
+      .part-life { border-radius:8px; padding:6px 8px; background:rgba(48,180,122,.12); }
+      .part-life.warning { color:#ffe083; background:rgba(213,158,27,.18); }
+      .part-life.critical { color:#ffbd6b; background:rgba(225,105,22,.2); }
+      .part-life.expired { color:#ff8b8b; background:rgba(195,42,42,.22); }
+      .compatibility-note { padding-left:8px; border-left:2px solid #5dc9a1; color:#b8eedb !important; }
+      .upgrade-options-title { margin-bottom:2px !important; color:#ffe08a !important; font-weight:800; }
+      #maintenance-open { pointer-events:auto; cursor:pointer; border:1px solid rgba(255,255,255,.35); }
+      #station-interact { display:none; position:fixed; z-index:12; left:50%; bottom:calc(5% + 88px + env(safe-area-inset-bottom)); transform:translateX(-50%); border:1px solid rgba(255,255,255,.6); background:#087c55; color:#fff; cursor:pointer; white-space:nowrap; }
+      #station-interact.visible { display:block; }
+      #service-panel { display:none; position:fixed; z-index:32; left:50%; bottom:calc(5% + 88px + env(safe-area-inset-bottom)); transform:translateX(-50%); width:min(480px, calc(100vw - 24px)); max-height:min(62vh, 570px); overflow:auto; box-sizing:border-box; padding:14px; border:1px solid rgba(255,207,63,.72); border-radius:16px; color:#f6f7fb; background:rgba(13,25,40,.97); box-shadow:0 15px 48px rgba(0,0,0,.58); pointer-events:auto; -webkit-overflow-scrolling:touch; }
+      #service-panel.open { display:block; }
+      #service-panel h3 { margin:0 0 8px; color:#ffcf3f; font-size:17px; }
+      #service-panel p { margin:6px 0; color:#dce5ee; font-size:13px; line-height:1.4; }
+      .service-actions { display:flex; flex-wrap:wrap; gap:7px; margin-top:10px; }
+      .service-actions button { border:0; border-radius:9px; padding:9px 11px; background:#177b5a; color:#fff; font:700 13px Inter,sans-serif; cursor:pointer; }
+      .service-actions button.secondary { background:#455b77; }
+      .service-actions button:disabled { opacity:.45; cursor:not-allowed; }
+      .service-input { box-sizing:border-box; width:min(150px, 42vw); margin:5px 5px 0 0; padding:8px; border:1px solid rgba(255,255,255,.25); border-radius:8px; background:#101b2a; color:#fff; font:600 14px Inter,sans-serif; }
+      @media (max-width:560px) { .pill { padding:7px 10px; font-size:12px; } .garage-head h2 { font-size:17px; } .garage-card { padding:11px; } #bike-status { min-width:0; } .status-meter { width:32px; } #service-panel { bottom:calc(5% + 88px + env(safe-area-inset-bottom)); max-height:52vh; } .dealer-preview-card { grid-template-columns:1fr; } .dealer-preview-stage,.dealer-preview-stage canvas { min-height:190px; } }
+      #settings-overlay { position:fixed; inset:0; z-index:50; display:none; align-items:center; justify-content:center; padding:12px; box-sizing:border-box; color:#f4f7fb; background:rgba(3,9,18,.88); }
+      #settings-overlay.open { display:flex; }
+      .settings-panel { width:min(700px,100%); max-height:min(90vh,760px); overflow:auto; border:1px solid rgba(112,190,255,.46); border-radius:20px; background:linear-gradient(145deg,#192b40,#09131f); box-shadow:0 20px 70px #000b; }
+      .settings-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:17px 18px 12px; }
+      .settings-head h2 { margin:0; color:#ffcf3f; font:700 20px Orbitron,Inter,sans-serif; }
+      .settings-tabs { display:flex; gap:8px; padding:0 16px 12px; border-bottom:1px solid #ffffff1c; }
+      .settings-tab { flex:1; border:0; border-radius:9px; padding:10px; color:#dbe8f5; background:#26384d; font:700 13px Inter,sans-serif; cursor:pointer; }
+      .settings-tab.active { color:#101820; background:#ffcf3f; }
+      #settings-content { min-height:230px; padding:15px 18px 18px; }
+      .settings-row { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:12px 0; border-bottom:1px solid #ffffff14; }
+      .settings-row:last-child { border-bottom:0; }
+      .settings-row strong { display:block; color:#f4f7fb; font-size:14px; }
+      .settings-row small { display:block; margin-top:4px; color:#aabbd0; font-size:11px; }
+      .settings-range { width:min(230px,43vw); accent-color:#ffcf3f; }
+      .settings-value { min-width:42px; color:#ffdf80; font-weight:800; text-align:right; }
+      .settings-presets { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin:10px 0; }
+      .settings-preset { border:1px solid #ffffff1f; border-radius:10px; padding:12px 6px; color:#eaf2fb; background:#26384d; font:700 13px Inter,sans-serif; cursor:pointer; }
+      .settings-preset.active { border-color:#ffcf3f; color:#151a22; background:#ffcf3f; }
+      .settings-note { color:#aabbd0; font-size:12px; line-height:1.5; }
+      .settings-section-title { margin:0 0 6px; color:#ffdf80; font:700 15px Inter,sans-serif; }
+      .settings-row > span:first-child { min-width:0; flex:1; }
+      .settings-control { display:flex; flex:0 0 min(290px,47%); align-items:center; justify-content:flex-end; gap:8px; }
+      .settings-control .settings-range { flex:1; width:auto; min-width:64px; max-width:230px; }
+      .settings-control .settings-value { flex:0 0 42px; }
+      .settings-mute-row { margin-top:5px; }
+      .settings-note { margin:12px 0 0; }
+      @media (max-width:520px) { .settings-head { padding:13px 14px 10px; } .settings-head h2 { font-size:17px; } #settings-content { padding:12px 14px 15px; } .settings-row { gap:8px; } .settings-row strong { font-size:12px; } .settings-presets { gap:5px; } .settings-preset { padding:10px 3px; font-size:11px; } .settings-control { flex-basis:46%; gap:5px; } .settings-control .settings-value { flex-basis:36px; font-size:12px; } }
+    </style>
+  </head>
+  <body>
+    <div id="game-container"></div>
+    <div id="hud"><span class="pill" id="money">₺500</span><span class="pill" id="count">Teslimat: 0</span><span class="pill" id="time">Vardiya 09:00 · Sipariş bekleniyor</span><button class="pill" id="maintenance-open">🛠 Bakım</button></div>
+    <section id="bike-dashboard" aria-label="Motosiklet göstergeleri">
+      <div class="dashboard-speed"><span>HIZ</span><span><strong id="bike-speed">0</strong> km/sa</span></div>
+      <div class="dashboard-meter"><span>Yakıt</span><span class="dashboard-meter-track"><i class="dashboard-meter-fill" id="fuel-meter"></i></span><span id="fuel-value">5,0 L</span></div>
+      <div class="dashboard-meter condition"><span>Durum</span><span class="dashboard-meter-track"><i class="dashboard-meter-fill" id="condition-meter"></i></span><span id="condition-value">%100</span></div>
+    </section>
+    <button class="pill" id="station-interact">⛽ Yakıt Al</button>
+    <section id="service-panel" aria-live="polite"><div id="service-content"></div></section>
+    <div id="top-actions" role="group" aria-label="Menü ve ses kontrolleri">
+      <button class="pill" id="settings-open" aria-label="Ayarları aç" title="Ayarlar">⚙</button>
+      <button class="pill" id="garage-open">🏍 Garaj</button>
+      <button class="pill" id="mute" aria-label="Sesi aç veya kapat">🔊</button>
+    </div>
+    <section id="settings-overlay" aria-hidden="true">
+      <div class="settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <header class="settings-head"><h2 id="settings-title">DURAKLAT / AYARLAR</h2><button class="garage-action" data-settings-action="resume">Devam Et</button></header>
+        <nav class="settings-tabs" role="tablist" aria-label="Ayar bölümleri">
+          <button class="settings-tab active" id="settings-tab-graphics" role="tab" aria-selected="true" aria-controls="settings-content" data-settings-tab="graphics">Grafik</button>
+          <button class="settings-tab" id="settings-tab-audio" role="tab" aria-selected="false" aria-controls="settings-content" data-settings-tab="audio">Ses</button>
+          <button class="settings-tab" id="settings-tab-game" role="tab" aria-selected="false" aria-controls="settings-content" data-settings-tab="game">Oyun</button>
+        </nav>
+        <div id="settings-content" role="tabpanel" aria-labelledby="settings-tab-graphics"></div>
+      </div>
+    </section>
+    <section id="garage-overlay" aria-hidden="true">
+      <div class="garage-panel" role="dialog" aria-modal="true" aria-labelledby="garage-title">
+        <header class="garage-head">
+          <div><h2 id="garage-title">Motosiklet Garajı</h2><p id="garage-summary"></p></div>
+          <button id="garage-shift-action" class="garage-action">Vardiyaya Başla</button>
+          <button class="garage-close" id="garage-close" aria-label="Garajı kapat">✕</button>
+        </header>
+        <nav class="garage-tabs" id="garage-tabs" aria-label="Garaj bölümleri">
+          <button class="garage-tab active" data-garage-tab="owned">Motosikletlerim</button>
+          <button class="garage-tab" data-garage-tab="dealership">🏍 Bayi</button>
+          <button class="garage-tab" data-garage-tab="maintenance">Bakım</button>
+          <button class="garage-tab" data-garage-tab="performance">Performans</button>
+          <button class="garage-tab" data-garage-tab="career">Kariyer</button>
+          <button class="garage-tab" data-garage-tab="cosmetics">Kozmetik</button>
+          <button class="garage-tab" data-garage-tab="market">İkinci El Pazarı</button>
+          <button class="garage-tab" data-garage-tab="player-listings">İlanlarım</button>
+          <button class="garage-tab" data-garage-tab="favorites">Favorilerim</button>
+          <button class="garage-tab" data-garage-tab="capacity">Garaj Kapasitesi</button>
+        </nav>
+        <p id="garage-notice" class="garage-notice" aria-live="polite"></p>
+        <div id="garage-content"></div>
+      </div>
+    </section>
+    <section id="garage-confirm" class="garage-confirm" aria-hidden="true">
+      <div class="garage-confirm-card" role="alertdialog" aria-modal="true">
+        <h3 id="garage-confirm-title">Satın alma onayı</h3>
+        <p id="garage-confirm-text"></p>
+        <div class="garage-bottom">
+          <button id="garage-confirm-cancel" class="garage-action secondary">Vazgeç</button>
+          <button id="garage-confirm-accept" class="garage-action">Onayla</button>
+        </div>
+      </div>
+    </section>
+    <div id="msg"></div>
+    <div id="steering-area" aria-hidden="true"><span>Kaydırarak direksiyon<br>← sola · sağa →</span></div>
+    <aside id="minimap-panel" aria-label="İstanbul şehir mini haritası">
+      <div class="minimap-head"><span>ŞEHİR HARİTASI</span><span id="minimap-phase">BEKLEMEDE</span></div>
+      <canvas id="minimap-canvas" role="img" aria-label="Kurye konumu, şehir yolları ve aktif teslimat hedefi"></canvas>
+      <div class="minimap-legend" aria-hidden="true">
+        <span><i class="minimap-dot player"></i>Kurye</span>
+        <span><i class="minimap-dot restaurant"></i>Restoran</span>
+        <span><i class="minimap-dot customer"></i>Müşteri</span>
+        <span><i class="minimap-dot fuel"></i>Yakıt</span>
+      </div>
+    </aside>
+    <section id="day-summary" aria-hidden="true">
+      <div class="day-summary-card" role="dialog" aria-modal="true" aria-labelledby="day-summary-title">
+        <h2 id="day-summary-title">Vardiya Özeti</h2>
+        <div id="day-summary-content"></div>
+        <div class="garage-bottom"><button class="garage-action" id="day-summary-close">Devam Et</button></div>
+      </div>
+    </section>
+    <div id="start"><h1>MotoKurye: İstanbul</h1><p>Restorandan siparişi al ve süre dolmadan müşteriye teslim et!</p><p>PC: WASD / Ok tuşları · Mobil: ekran butonları</p><button id="play">BAŞLA</button></div>
+    <div class="tb" id="bL" style="left:4%">◀</div>
+    <div class="tb" id="bR" style="left:calc(4% + 90px)">▶</div>
+    <div class="tb" id="bB" style="right:calc(4% + 90px)">FREN / GERİ</div>
+    <div class="tb" id="bG" style="right:4%">GAZ</div>
+    <script type="module" src="main.js"></script>
+    <script src="https://storage.googleapis.com/rosebud_staticfiles/ChatManager.js"></script>
+    <script src="https://storage.googleapis.com/rosebud_staticfiles/ProgressLogger.js"></script>
+    <script src="https://storage.googleapis.com/rosebud_staticfiles/OGP.js"></script>
+  </body>
+</html>
